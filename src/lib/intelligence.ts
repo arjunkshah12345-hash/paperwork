@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, TextRenderingMode, popGraphicsState, pushGraphicsState, setTextRenderingMode } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb, TextRenderingMode, popGraphicsState, pushGraphicsState, setTextRenderingMode } from 'pdf-lib'
 import { textRunSpans } from './text-runs'
 
 export const intelligenceTools: string[] = ['encrypt', 'remove-password', 'unlock', 'auto-redact', 'redaction-check', 'privacy-scan', 'fingerprint', 'ocr', 'handwriting-pdf', 'audio-pdf']
@@ -290,9 +290,26 @@ async function audioPdf(file: File, options: Options): Promise<Result> {
 const fingerprintKey = 'PaperworkFingerprint'
 const fingerprintPattern = /PWFP-[0-9A-F]{16}/
 
+export const trackingOrigin: string = ((import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_TRACKING_ORIGIN ?? 'https://paperwork-pdf-emx.pages.dev').replace(/\/$/, '')
+
+async function trackingEvents(file: File): Promise<Result> {
+  let ledger: { fingerprint?: string; trackingKey?: string; recipient?: string | null }
+  try { ledger = JSON.parse(await file.text()) } catch { throw new Error('Choose the ledger JSON file that was downloaded with the tracked copy.') }
+  const [id, token] = (ledger.trackingKey ?? '').split('.')
+  if (!id || !token || !fingerprintPattern.test(id)) throw new Error('This ledger has no tracking key. Only copies made with link tracking turned on can report clicks.')
+  let response: Response
+  try { response = await fetch(`${trackingOrigin}/api/track?id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}`) } catch { throw new Error('Could not reach the tracking server. Check your connection and try again.') }
+  const data = await response.json().catch(() => ({})) as { error?: string; events?: { at: string; link: number | 'verify'; country: string | null; browser: string }[]; links?: string[] }
+  if (!response.ok) throw new Error(data.error ?? `Tracking server error (${response.status}).`)
+  const events = (data.events ?? []).sort((a, b) => a.at.localeCompare(b.at))
+  const summary = { fingerprint: id, recipient: ledger.recipient ?? null, clicks: events.length, first: events[0]?.at ?? null, last: events.at(-1)?.at ?? null, events: events.map(event => ({ ...event, url: typeof event.link === 'number' ? data.links?.[event.link] ?? null : 'verification link' })) }
+  return report(file, 'tracking', summary, events.length ? `${events.length} click${events.length === 1 ? '' : 's'} recorded for ${id}${ledger.recipient ? ` (${ledger.recipient})` : ''}; last on ${new Date(events.at(-1)!.at).toLocaleString()}.` : `No clicks recorded yet for ${id}. Clicks only register when the recipient follows a link in the document.`)
+}
+
 async function fingerprintDocument(files: File[], options: Record<string, unknown>): Promise<Result> {
   if (files.length !== 1) throw new Error('Choose exactly one PDF.')
   const file = files[0]
+  if (options.mode === 'events') return trackingEvents(file)
   let document: PDFDocument
   try { document = await PDFDocument.load(await file.arrayBuffer(), { updateMetadata: false }) } catch { throw new Error(`Cannot open “${file.name}”. Choose a valid, unencrypted PDF.`) }
   const { PDFName, PDFString, PDFHexString } = await import('pdf-lib')
@@ -315,20 +332,51 @@ async function fingerprintDocument(files: File[], options: Record<string, unknow
     page.drawText(id, { x: 2, y: 2, size: 1, font })
     page.pushOperators(popGraphicsState())
   }
+  let tracking: { key: string; links: number } | undefined
+  if (options.track === 'on') {
+    const { PDFDict } = await import('pdf-lib')
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(24)), b => b.toString(16).padStart(2, '0')).join('')
+    const urls: string[] = []
+    for (const page of document.getPages()) {
+      const annots = page.node.Annots()
+      for (let i = 0; annots && i < annots.size(); i++) {
+        const annot = annots.lookup(i)
+        if (!(annot instanceof PDFDict) || annot.get(PDFName.of('Subtype'))?.toString() !== '/Link') continue
+        const action = annot.lookup(PDFName.of('A'))
+        if (!(action instanceof PDFDict) || action.get(PDFName.of('S'))?.toString() !== '/URI') continue
+        const uri = action.lookup(PDFName.of('URI'))
+        const target = uri instanceof PDFString || uri instanceof PDFHexString ? uri.decodeText() : ''
+        if (!/^(https?:|mailto:)/i.test(target) || urls.length >= 200) continue
+        action.set(PDFName.of('URI'), PDFString.of(`${trackingOrigin}/t/${id}?l=${urls.length}`))
+        urls.push(target)
+      }
+    }
+    const first = document.getPage(0), { width } = first.getSize()
+    const label = 'Verify this copy', size = 7, labelWidth = font.widthOfTextAtSize(label, size)
+    first.drawText(label, { x: width - labelWidth - 12, y: 8, size, font, color: rgb(0.45, 0.45, 0.45) })
+    const link = document.context.obj({ Type: 'Annot', Subtype: 'Link', Rect: [width - labelWidth - 14, 5, width - 10, 17], Border: [0, 0, 0], A: { S: 'URI', URI: PDFString.of(`${trackingOrigin}/t/${id}`) } })
+    const existing = first.node.Annots()
+    if (existing) existing.push(document.context.register(link))
+    else first.node.set(PDFName.of('Annots'), document.context.obj([document.context.register(link)]))
+    let response: Response
+    try { response = await fetch(`${trackingOrigin}/api/track`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, tokenHash: (await hashBytes(new TextEncoder().encode(token).buffer as ArrayBuffer)).sha256, urls }) }) } catch { throw new Error('Could not reach the tracking server, so no tracked copy was made. Try again, or turn link tracking off.') }
+    if (!response.ok) throw new Error(`The tracking server refused the registration (${response.status}). No tracked copy was made.`)
+    tracking = { key: `${id}.${token}`, links: urls.length }
+  }
   const bytes = await document.save()
-  const ledger = { fingerprint: id, recipient: recipient || null, file: file.name, created: new Date().toISOString(), sha256: (await hashBytes(bytes.slice().buffer)).sha256 }
+  const ledger = { fingerprint: id, recipient: recipient || null, file: file.name, created: new Date().toISOString(), sha256: (await hashBytes(bytes.slice().buffer)).sha256, ...(tracking ? { trackingKey: tracking.key, trackedLinks: tracking.links, trackingServer: trackingOrigin } : {}) }
   const { default: JSZip } = await import('jszip')
   const archive = new JSZip()
   archive.file(`${name(file)}-${id}.pdf`, bytes)
   archive.file(`${id}-ledger.json`, JSON.stringify(ledger, null, 2))
-  return { blob: new Blob([await archive.generateAsync({ type: 'arraybuffer' })], { type: 'application/zip' }), filename: `${name(file)}-${id}.zip`, message: `Embedded fingerprint ${id}${recipient ? ` for “${recipient}”` : ''} in metadata and as invisible text on every page. Keep the ledger to trace leaked copies. This identifies copies; it does not report when a file is opened, and a determined recipient can remove it (e.g. by printing or rasterizing).` }
+  return { blob: new Blob([await archive.generateAsync({ type: 'arraybuffer' })], { type: 'application/zip' }), filename: `${name(file)}-${id}.zip`, message: `Embedded fingerprint ${id}${recipient ? ` for “${recipient}”` : ''} in metadata and as invisible text on every page. Keep the ledger to trace leaked copies.${tracking ? ` Link tracking is on: ${tracking.links} existing link${tracking.links === 1 ? '' : 's'} plus a “Verify this copy” link now report clicks. Upload the ledger with “clicks” mode to see them.` : ''} PDF viewers do not report plain opens, and a determined recipient can remove the ID (e.g. by printing or rasterizing).` }
 }
 
 export async function processIntelligence(tool: string, files: File[], options: Record<string, unknown>): Promise<{ blob: Blob; filename: string; message?: string }> {
   if (!intelligenceTools.includes(tool)) throw new Error(`Unsupported intelligence tool: ${tool}`)
   if (!files.length) throw new Error('Choose a file first.')
   if (files.length !== 1 && tool !== 'fingerprint') throw new Error('This tool processes exactly one file at a time.')
-  if (tool === 'fingerprint' && (options.mode === 'embed' || options.mode === 'detect')) return fingerprintDocument(files, options)
+  if (tool === 'fingerprint' && (options.mode === 'embed' || options.mode === 'detect' || options.mode === 'events')) return fingerprintDocument(files, options)
   if (tool === 'fingerprint') {
     const fingerprints = await Promise.all(files.map(async (file) => ({ file: file.name, bytes: file.size, ...await hashBytes(await file.arrayBuffer()) })))
     return report(files[0], 'fingerprints', { fingerprints, note: 'SHA-256 is recommended for integrity. MD5 and SHA-1 are legacy checksums, not collision-resistant security guarantees.' }, 'Computed hashes of the original file bytes locally; files were not modified.')

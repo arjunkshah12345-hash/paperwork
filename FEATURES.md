@@ -40,7 +40,7 @@ Local = browser processing. Partial = meaningful implementation with differences
 | Flatten | Partial | Raster pages lose selectable text, links and fields. |
 | Invert colours | Local | Invert, sepia and grayscale via raster rebuild. |
 | Word to PDF | Partial | Keeps headings, bold/italic, lists, tables, images and links; columns, headers/footers and exact fonts are approximated. No legacy DOC. |
-| Images to PDF | Local | JPG/PNG embedded as-is; TIFF (every page) and BMP decoded losslessly; WebP, GIF (first frame), AVIF, SVG (2x) and HEIC decoded by the browser (HEIC needs Safari). Transparency kept via soft masks. |
+| Images to PDF | Local | JPG/PNG embedded as-is; TIFF (every page) and BMP decoded losslessly; WebP, GIF (first frame), AVIF and SVG (2x) decoded by the browser; HEIC uses the browser's decoder when it has one (Safari) and otherwise libheif (WebAssembly, LGPL-3.0, about 2 MB, loaded only for HEIC files). Transparency kept via soft masks. |
 | Text to PDF | Local | Uploaded/typed text; Western Latin default font. |
 | Excel to PDF | Partial | XLSX cells reflow; no XLS or Excel print-layout fidelity. |
 | PowerPoint to PDF | Partial | PPTX text reflow, not faithful slide rendering. |
@@ -50,7 +50,7 @@ Local = browser processing. Partial = meaningful implementation with differences
 | Resume | Partial | Basic content-to-PDF layout, not full template editor. |
 | CSV to PDF | Local | Parsed rows rendered to PDF. |
 | Audio to PDF | Conditional | Whisper tiny.en, English only; model download after consent. |
-| eBook to PDF | Partial | EPUB/TXT/HTML; no DRM, MOBI or AZW3. |
+| eBook to PDF | Partial | EPUB, MOBI, AZW, AZW3 (KF8), PRC, TXT and HTML; text and structure, not images or Kindle layout. DRM-protected and HUFF/CDIC-compressed Kindle books are refused. |
 | PDF to Word | Partial | Rebuilds headings (by font size), joined paragraphs, bold lines, bullet lists and aligned tables (real Word tables); not a facsimile of page layout or images. |
 | PDF to JPG | Local | Raster page images. |
 | PDF to TIFF | Local | Multipage RGBA TIFF, preserving selected order and duplicates; optional per-page ZIP. Uncompressed, 16 MP/page, 256 MiB/multipage file. DPI selectable from 72–600; large pages may render below the requested DPI. |
@@ -68,7 +68,7 @@ Local = browser processing. Partial = meaningful implementation with differences
 | Auto-redact PII | Conditional | OCR/pattern/custom-term masks; false negatives/positives remain possible. |
 | Redaction checker | Partial | Text/structure inspection; cannot certify image pixels contain no secrets. |
 | Privacy scanner | Partial | Heuristic inspection, not forensic certification. |
-| Fingerprint / open tracking | Partial | Checksums; per-recipient embedded ID (metadata + invisible page text) with ledger, and leak detection. **No open-event tracking** (requires a hosted server). |
+| Fingerprint / open tracking | Partial | Checksums; per-recipient embedded ID (metadata + invisible page text) with ledger, and leak detection. Opt-in link-click tracking: existing web links plus a “Verify this copy” link are routed through the Paperwork server (Cloudflare Pages Functions + KV), which logs time, country and browser family per click and redirects only to the registered URLs; the ledger's key reads the clicks back. **Plain opens are not reported**, because PDF viewers do not load remote content on open. |
 | Chat with PDF | Conditional | Browser LanguageModel API; no cloud fallback. |
 | Summarize | Conditional | Same browser AI requirement; hallucinations remain possible. |
 | Searchable OCR | Conditional | Tesseract download after consent; unsupported font characters rejected. |
@@ -92,7 +92,7 @@ Additional tools include Add Text, PNG export and conversion subformats. Catalog
 
 ## Remaining parity work
 
-Hosted opt-in open tracking; Office/HTML layout fidelity; MOBI/AZW3 eBooks; HEIC outside Safari; richer visual controls and business/reporting features. These are not finished just because a related card exists.
+Office/HTML layout fidelity; HUFF/CDIC and DRM Kindle books; true open-event tracking (not possible without viewer cooperation); richer visual controls and business/reporting features. These are not finished just because a related card exists.
 
 ## SEO / answer engines
 

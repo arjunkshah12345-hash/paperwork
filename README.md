@@ -1,6 +1,6 @@
 # Paperwork
 
-A free, MIT-licensed, local-first PDF toolkit. An independent open-source alternative inspired by [ihatepdf.cv](https://www.ihatepdf.cv/), not affiliated with it. No account, API key, or application backend is required.
+A free, MIT-licensed, local-first PDF toolkit. An independent open-source alternative inspired by [ihatepdf.cv](https://www.ihatepdf.cv/), not affiliated with it. No account or API key is required. Everything runs in the browser; the only server feature is optional link-click tracking for fingerprinted copies.
 
 **75 tools:** editing and organization, Office/text/eBook conversion, OCR, password protection, browser AI, invoices, scanning, and peer collaboration. The catalog accounts for the reference site's 73 tool entries, plus Add Text and PNG export. **This is not exact feature parity:** see [FEATURES.md](FEATURES.md) for the complete inventory, approximations, and remaining gaps. In particular, checksum generation does not replace the reference's document-open tracking, and read-aloud does not export audio files.
 
@@ -32,6 +32,8 @@ Conversions are deliberately explicit about fidelity. DOCX, XLSX, PPTX, HTML, an
 ## Privacy and prerequisites
 
 Document processing runs in the browser. There are no application analytics or automatic document uploads. Fonts and PDF.js workers are bundled. OCR and audio transcription download third-party recognition resources after explicit consent; browser AI may download its on-device model after consent. These capabilities are not guaranteed offline on first use. The app does not send document content to those resource hosts.
+
+Link-click tracking is off unless you turn it on for a fingerprinted copy. When on, the copy's fingerprint ID, a hash of your private key, and the list of web links found in the PDF are sent to the Paperwork server; recipients' clicks record time, country and browser family. Document content is never sent. Records expire after a year.
 
 Peer sharing and collaborative whiteboards intentionally send data to the peer you pair with using manual WebRTC signaling. There is no hosted signaling or TURN relay, so some network pairs cannot connect. Camera use needs permission and a secure context. Read-aloud uses an installed local speech voice. Chat and summarization require a supported browser's on-device `LanguageModel` API; there is no cloud or fake-summary fallback.
 
