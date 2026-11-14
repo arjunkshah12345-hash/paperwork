@@ -1,6 +1,8 @@
 # Deployment
 
-Paperwork builds to static files in `dist/`. It needs no backend, database, or application secrets. Hosting does not receive the documents users process.
+Paperwork builds to static files in `dist/`. It needs no database or application secrets. Hosting does not receive the documents users process.
+
+The one optional server feature, link-click tracking in **Fingerprint & Checksums**, runs as Cloudflare Pages Functions in `functions/` with a Workers KV namespace bound as `TRACKING` (see `wrangler.toml`). `wrangler pages deploy` picks up `functions/` automatically. Forks that host elsewhere can ignore it; set `VITE_TRACKING_ORIGIN` at build time to point the app at your own deployment, or leave the default. Create your own namespace with `npx wrangler kv namespace create paperwork-tracking` and put its id in `wrangler.toml`.
 
 ```sh
 npm ci

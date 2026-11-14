@@ -90,6 +90,35 @@ export function drawImageRef(page: PDFPage, ref: PDFRef, x: number, y: number, w
   page.pushOperators(pushGraphicsState(), concatTransformationMatrix(width, 0, 0, height, x, y), drawObject(name), popGraphicsState())
 }
 
+type HeifImage = { get_width(): number; get_height(): number; display(target: { data: Uint8ClampedArray; width: number; height: number }, done: (result: { data: Uint8ClampedArray } | null) => void): void; free?(): void }
+
+/** Decode HEIC/HEIF with libheif (WebAssembly, loaded on demand) for browsers without native support. Returns the primary image. */
+export async function decodeHeic(bytes: Uint8Array): Promise<DecodedImage> {
+  const factory = (await import('libheif-js/libheif-wasm/libheif-bundle.mjs')).default as unknown as () => { HeifDecoder: new () => { decode(data: Uint8Array): HeifImage[] } } | Promise<{ HeifDecoder: new () => { decode(data: Uint8Array): HeifImage[] } }>
+  const library = await factory()
+  const images = new library.HeifDecoder().decode(bytes)
+  if (!images.length) throw new Error('This HEIC file contains no images.')
+  const image = images[0], width = image.get_width(), height = image.get_height()
+  if (width * height > 100_000_000) throw new Error('This HEIC image is too large to convert.')
+  const result = await new Promise<{ data: Uint8ClampedArray } | null>(resolve => image.display({ data: new Uint8ClampedArray(width * height * 4), width, height }, resolve))
+  for (const item of images) item.free?.()
+  if (!result) throw new Error('This HEIC file could not be decoded.')
+  return { width, height, rgba: result.data }
+}
+
+async function rgbaToJpeg(image: DecodedImage): Promise<Uint8Array | undefined> {
+  if (typeof document === 'undefined') return undefined
+  const canvas = document.createElement('canvas')
+  canvas.width = image.width; canvas.height = image.height
+  try {
+    const context = canvas.getContext('2d')
+    if (!context) return undefined
+    context.putImageData(new ImageData(new Uint8ClampedArray(image.rgba), image.width, image.height), 0, 0)
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+    return blob ? new Uint8Array(await blob.arrayBuffer()) : undefined
+  } finally { canvas.width = 0; canvas.height = 0 }
+}
+
 /** Browser decode for formats pdf-lib cannot embed directly. Opaque photos become JPEG; anything with transparency stays lossless. */
 async function browserDecode(bytes: Uint8Array, format: ImageFormat, filename: string): Promise<{ jpeg?: Uint8Array; image?: DecodedImage }> {
   if (typeof document === 'undefined') throw new Error(`${format.toUpperCase()} images can only be converted in a browser.`)
@@ -137,7 +166,14 @@ export async function embedImageFile(document: PDFDocument, bytes: Uint8Array, f
     }
     if (format === 'bmp') return [fromRef(decodeBmp(bytes))]
     if (format === 'tiff') return (await decodeTiff(bytes)).map(fromRef)
-    const decoded = await browserDecode(bytes, format, filename)
+    let decoded: { jpeg?: Uint8Array; image?: DecodedImage }
+    if (format === 'heic') {
+      try { decoded = await browserDecode(bytes, format, filename) } catch {
+        const image = await decodeHeic(bytes)
+        const jpeg = await rgbaToJpeg(image)
+        decoded = jpeg ? { jpeg } : { image }
+      }
+    } else decoded = await browserDecode(bytes, format, filename)
     if (decoded.jpeg) { const image = await document.embedJpg(decoded.jpeg); return [{ width: image.width, height: image.height, draw: (page, x, y, width, height) => page.drawImage(image, { x, y, width, height }) }] }
     return [fromRef(decoded.image!)]
   } catch (error) {

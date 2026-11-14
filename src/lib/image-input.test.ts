@@ -70,3 +70,20 @@ describe('image input formats', () => {
     await expect(embedImageFile(document, new TextEncoder().encode('nope'), 'x.png')).rejects.toThrow('not a supported image')
   })
 })
+
+describe('HEIC without native browser support', () => {
+  it('decodes a real iPhone-style HEIC with libheif and embeds it', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const { PDFDocument } = await import('pdf-lib')
+    const { decodeHeic, embedImageFile } = await import('./image-input')
+    const bytes = new Uint8Array(await readFile(new URL('./fixtures/sample.heic', import.meta.url)))
+    const decoded = await decodeHeic(bytes)
+    expect([decoded.width, decoded.height]).toEqual([123, 160])
+    expect(decoded.rgba.length).toBe(123 * 160 * 4)
+    const document = await PDFDocument.create()
+    const [image] = await embedImageFile(document, bytes, 'photo.heic')
+    expect([image.width, image.height]).toEqual([123, 160])
+    image.draw(document.addPage([200, 200]), 0, 0, 123, 160)
+    expect((await document.save()).length).toBeGreaterThan(1000)
+  })
+})

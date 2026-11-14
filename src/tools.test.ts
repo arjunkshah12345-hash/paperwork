@@ -38,8 +38,8 @@ describe('tool catalog and dispatch', () => {
   })
 
   it('discloses non-equivalent tracking and audio capabilities', () => {
-    expect(tools.find(tool => tool.id === 'fingerprint')?.notice).toContain('Does not')
-    expect(tools.find(tool => tool.id === 'fingerprint')?.notice).toContain('no open-event tracking')
+    expect(tools.find(tool => tool.id === 'fingerprint')?.notice).toContain('Paperwork server')
+    expect(tools.find(tool => tool.id === 'fingerprint')?.notice).toContain('plain opens are not reported')
     expect(tools.find(tool => tool.id === 'pdf-audio')?.notice).toContain('downloads an open speech model')
   })
 })

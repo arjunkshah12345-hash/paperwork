@@ -1,0 +1,9 @@
+name = "paperwork-pdf"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-11-01"
+
+# Optional hosted link-click tracking (functions/). Forks can delete this binding;
+# the static app keeps working and the tracking mode reports that the server is unavailable.
+[[kv_namespaces]]
+binding = "TRACKING"
+id = "6e259d9dcce844ae80eab3986681187c"

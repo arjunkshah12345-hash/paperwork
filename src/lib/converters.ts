@@ -408,6 +408,12 @@ function archivePath(base: string, relative: string): string {
 }
 
 async function ebookText(file: File): Promise<string> {
+  if (/\.(mobi|azw3?|prc)$/i.test(file.name)) {
+    const { readMobi } = await import('./mobi')
+    const book = readMobi(new Uint8Array(await file.arrayBuffer()))
+    return book.html.split(/<mbp:pagebreak[^>]*>/i).map(htmlText).filter(Boolean).join('\f')
+  }
+  if (/\.html?$/i.test(file.name)) return htmlText(await file.text())
   if (!file.name.toLowerCase().endsWith('.epub')) return file.text()
   const zip = await JSZip.loadAsync(await file.arrayBuffer())
   const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true, processEntities: false })
@@ -618,7 +624,7 @@ export async function processConversion(tool: string, files: File[], options: Op
   let text: string
   let warning = ''
   if (tool === 'ebook-pdf') {
-    text = optionText(options, 'text').trim() ? optionText(options, 'text') : await ebookText(requireFile(files, ['epub', 'txt']))
+    text = optionText(options, 'text').trim() ? optionText(options, 'text') : await ebookText(requireFile(files, ['epub', 'txt', 'html', 'htm', 'mobi', 'azw', 'azw3', 'prc']))
     warning = `${textWarning} DRM-protected EPUB, MOBI and AZW are not supported.`
   } else if (tool === 'csv-pdf') {
     const csv = await sourceText(files, options, ['csv', 'tsv', 'txt'])
