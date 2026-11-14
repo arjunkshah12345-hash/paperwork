@@ -1,0 +1,29 @@
+<template>
+  <style>
+    @font-face { font-family: "DM Sans"; font-weight: 600; src: url("assets/fonts/dm-sans-latin-600-normal.woff2") format("woff2"); }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #fafaf8; font-family: "DM Sans", sans-serif; }
+    #hook-cam { position: absolute; left: 0; top: 0; width: 1700px; height: 2200px; transform-origin: 0 0; }
+    #hook-sheet { position: absolute; inset: 0; width: 1700px; height: 2200px; background: #fff; }
+    #hook-sel { position: absolute; left: 140px; top: 438px; width: 1350px; height: 0; background: rgba(66, 118, 230, 0.24); }
+    #hook-title { position: absolute; left: 0; right: 0; top: 860px; text-align: center; font-size: 84px; font-weight: 600; letter-spacing: -0.035em; color: #292c28; }
+    #hook-cursor { position: absolute; left: 0; top: 0; width: 64px; height: 64px; }
+  </style>
+  <div id="root" data-composition-id="hook" data-width="1920" data-height="1080">
+    <div id="hook-cam">
+      <img id="hook-sheet" src="assets/report.png" alt="Northwind Coffee Q3 report" />
+      <div id="hook-sel"></div>
+    </div>
+    <div id="hook-title" data-var-text="hook-line">Need this table in a spreadsheet?</div>
+    <svg id="hook-cursor" viewBox="0 0 32 32"><path d="M6 3l19 13-8.5 1.6L21 27l-4 2-4.6-9.6L6 25z" fill="#fff" stroke="#292c28" stroke-width="2" stroke-linejoin="round"/></svg>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // Camera: push in on the table, then hold while the cursor selects it.
+    tl.fromTo("#hook-cam", { x: 92, y: -150, scale: 1.04 }, { x: 33, y: -231, scale: 1.14, duration: 1.1, ease: "power2.inOut" }, 0);
+    tl.fromTo("#hook-cursor", { x: 1500, y: 1120 }, { x: 196, y: 262, duration: 0.7, ease: "power3.out" }, 0.55);
+    tl.fromTo("#hook-sel", { height: 0, width: 0 }, { height: 352, width: 1350, duration: 0.9, ease: "power1.inOut" }, 1.35);
+    tl.to("#hook-cursor", { x: 1712, y: 668, duration: 0.9, ease: "power1.inOut" }, 1.35);
+    
+    window.__timelines["hook"] = tl;
+  </script>
+</template>

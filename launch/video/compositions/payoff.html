@@ -1,0 +1,60 @@
+<template>
+  <style>
+    @font-face { font-family: "DM Sans"; font-weight: 400; src: url("assets/fonts/dm-sans-latin-400-normal.woff2") format("woff2"); }
+    @font-face { font-family: "DM Sans"; font-weight: 600; src: url("assets/fonts/dm-sans-latin-600-normal.woff2") format("woff2"); }
+    @font-face { font-family: "DM Sans"; font-weight: 700; src: url("assets/fonts/dm-sans-latin-700-normal.woff2") format("woff2"); }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #fafaf8; font-family: "DM Sans", sans-serif; color: #292c28; }
+    #payoff-title { position: absolute; left: 0; right: 0; top: 70px; text-align: center; font-size: 84px; font-weight: 700; letter-spacing: -0.04em; }
+    #payoff-title b { color: #bc4d32; }
+    #payoff-sheet { position: absolute; left: 160px; top: 220px; width: 1600px; background: #fff; border: 2px solid #e4e5de; border-radius: 16px; overflow: hidden; }
+    #payoff-fx { display: flex; align-items: center; gap: 24px; height: 64px; padding: 0 24px; border-bottom: 2px solid #e4e5de; font-size: 30px; }
+    #payoff-fx em { font-style: italic; color: #5d6159; font-weight: 600; }
+    #payoff-ref { width: 90px; color: #5d6159; }
+    .payoff-r { display: grid; grid-template-columns: 64px 560px 240px 420px 316px; height: 58px; border-bottom: 1px solid #efefea; font-size: 30px; }
+    .payoff-r > span { display: flex; align-items: center; padding: 0 18px; border-right: 1px solid #efefea; white-space: nowrap; }
+    .payoff-r > span:first-child { justify-content: center; padding: 0; color: #5d6159; background: #f7f7f3; font-size: 28px; }
+    .payoff-h { height: 42px; background: #f7f7f3; }
+    .payoff-h > span { justify-content: center; color: #5d6159; font-size: 28px; }
+    .num { justify-content: flex-end; font-variant-numeric: tabular-nums; }
+    .bold { font-weight: 700; }
+    .payoff-r > span.spill { overflow: visible; position: relative; z-index: 2; border-right-color: transparent; }
+    .payoff-c { opacity: 0; }
+    #payoff-sel { position: absolute; left: 1026px; top: 567px; width: 420px; height: 58px; border: 4px solid #bc4d32; background: rgba(188, 77, 50, 0.08); opacity: 0; }
+    #payoff-status { display: flex; justify-content: flex-end; align-items: center; height: 70px; padding: 0 28px; font-size: 30px; color: #5d6159; }
+    #payoff-sum { padding: 8px 20px; border-radius: 12px; background: #bc4d32; color: #fff; font-weight: 700; opacity: 0; }
+    #payoff-cursor { position: absolute; left: 0; top: 0; width: 64px; height: 64px; }
+  </style>
+  <div id="root" data-composition-id="payoff" data-width="1920" data-height="1080">
+    <div id="payoff-title"><span id="payoff-line">Real columns. <b>Real numbers.</b></span></div>
+    <div id="payoff-sheet">
+      <div id="payoff-fx"><span id="payoff-ref">C5</span><em>fx</em><span id="payoff-val">1284500</span></div>
+      <div class="payoff-r payoff-h"><span></span><span>A</span><span>B</span><span>C</span><span>D</span></div>
+      <div class="payoff-r"><span>1</span><span class="payoff-c bold">Northwind Coffee Co.</span><span></span><span></span><span></span></div>
+      <div class="payoff-r"><span>2</span><span class="payoff-c">Q3 2026 regional results</span><span></span><span></span><span></span></div>
+      <div class="payoff-r"><span>3</span><span class="payoff-c spill" data-layout-allow-overflow>Revenue grew in every region this quarter, led by the Pacific stores.</span><span></span><span></span><span></span></div>
+      <div class="payoff-r"><span>4</span><span class="payoff-c bold">Region</span><span class="payoff-c bold num">Stores</span><span class="payoff-c bold num">Revenue</span><span class="payoff-c bold num">Growth</span></div>
+      <div class="payoff-r"><span>5</span><span class="payoff-c">Pacific</span><span class="payoff-c num">42</span><span class="payoff-c num">$1,284,500.00</span><span class="payoff-c num">12.4%</span></div>
+      <div class="payoff-r"><span>6</span><span class="payoff-c">Mountain</span><span class="payoff-c num">18</span><span class="payoff-c num">$402,900.00</span><span class="payoff-c num">6.1%</span></div>
+      <div class="payoff-r"><span>7</span><span class="payoff-c">Midwest</span><span class="payoff-c num">27</span><span class="payoff-c num">$655,300.00</span><span class="payoff-c num">3.8%</span></div>
+      <div class="payoff-r"><span>8</span><span class="payoff-c">Northeast</span><span class="payoff-c num">35</span><span class="payoff-c num">$1,019,750.00</span><span class="payoff-c num">9.2%</span></div>
+      <div class="payoff-r"><span>9</span><span class="payoff-c">South</span><span class="payoff-c num">31</span><span class="payoff-c num">$788,100.00</span><span class="payoff-c num">4.5%</span></div>
+      <div id="payoff-status"><span id="payoff-sum">Sum&nbsp;&nbsp;$4,150,550.00</span></div>
+    </div>
+    <div id="payoff-sel"></div>
+    <svg id="payoff-cursor" viewBox="0 0 32 32"><path d="M6 3l19 13-8.5 1.6L21 27l-4 2-4.6-9.6L6 25z" fill="#fff" stroke="#292c28" stroke-width="2" stroke-linejoin="round"/></svg>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // Cells arrive row by row, each in its own column.
+    tl.fromTo("#payoff-sheet .payoff-c", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.2, stagger: 0.045, ease: "power2.out" }, 0.25);
+    tl.fromTo("#payoff-fx", { opacity: 0 }, { opacity: 1, duration: 0.2 }, 0.2);
+    tl.fromTo("#payoff-title", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.4);
+    // Select the Revenue column: C5 to C9 (sheet top 220 + fx 66 + header 43 + 3 rows).
+    tl.fromTo("#payoff-cursor", { x: 1980, y: 1150 }, { x: 1300, y: 584, duration: 0.7, ease: "power3.out" }, 1.9);
+    tl.fromTo("#payoff-sel", { height: 58, opacity: 0 }, { opacity: 1, duration: 0.1 }, 2.6);
+    tl.to("#payoff-sel", { height: 295, duration: 0.6, ease: "power1.inOut" }, 2.75);
+    tl.to("#payoff-cursor", { y: 820, duration: 0.6, ease: "power1.inOut" }, 2.75);
+    tl.fromTo("#payoff-sum", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(2)" }, 3.4);
+    window.__timelines["payoff"] = tl;
+  </script>
+</template>

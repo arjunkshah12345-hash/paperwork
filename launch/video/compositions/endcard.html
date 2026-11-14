@@ -1,0 +1,39 @@
+<template>
+  <style>
+    @font-face { font-family: "DM Sans"; font-weight: 500; src: url("assets/fonts/dm-sans-latin-500-normal.woff2") format("woff2"); }
+    @font-face { font-family: "DM Sans"; font-weight: 700; src: url("assets/fonts/dm-sans-latin-700-normal.woff2") format("woff2"); }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #fafaf8; font-family: "DM Sans", sans-serif; color: #292c28; }
+    #end-lockup { position: absolute; left: 0; right: 0; top: 330px; display: flex; align-items: center; justify-content: center; gap: 40px; }
+    #end-mark { width: 200px; height: 200px; }
+    #end-word { font-size: 170px; font-weight: 700; letter-spacing: -0.05em; white-space: nowrap; }
+    #end-word b { color: #bc4d32; }
+    .end-ch { opacity: 0; }
+    #end-cta { position: absolute; left: 0; right: 0; top: 650px; display: flex; flex-direction: column; align-items: center; gap: 28px; }
+    #end-url { padding: 22px 44px; border-radius: 18px; background: #bc4d32; color: #fff; font-size: 52px; font-weight: 700; letter-spacing: -0.02em; opacity: 0; }
+    #end-meta { font-size: 38px; font-weight: 500; color: #5d6159; opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="endcard" data-width="1920" data-height="1080">
+    <div id="end-lockup">
+      <svg id="end-mark" viewBox="0 0 48 48">
+        <rect id="end-tile" width="48" height="48" rx="12" fill="#e85b3b" />
+        <path id="end-doc" d="M15 11h12l7 7v19H15z" fill="none" stroke="#fff" stroke-width="2.5" stroke-linejoin="round" />
+        <path id="end-lines" d="M27 11v8h7M20 25h9M20 30h7" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" />
+      </svg>
+      <div id="end-word"><span class="end-ch">p</span><span class="end-ch">a</span><span class="end-ch">p</span><span class="end-ch">e</span><span class="end-ch">r</span><span class="end-ch">w</span><span class="end-ch">o</span><span class="end-ch">r</span><span class="end-ch">k</span><b class="end-ch">.</b></div>
+    </div>
+    <div id="end-cta">
+      <div id="end-url" data-var-text="end-url">paperwork-pdf-emx.pages.dev</div>
+      <div id="end-meta" data-var-text="end-meta">Free and open source · MIT</div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#end-mark", { scale: 0.2, rotation: -12, opacity: 0, transformOrigin: "50% 50%" }, { scale: 1, rotation: 0, opacity: 1, duration: 0.5, ease: "back.out(1.6)" }, 0.05);
+    tl.fromTo("#end-doc", { strokeDasharray: 80, strokeDashoffset: 80 }, { strokeDashoffset: 0, duration: 0.55, ease: "power2.inOut" }, 0.35);
+    tl.fromTo("#end-lines", { strokeDasharray: 40, strokeDashoffset: 40 }, { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" }, 0.7);
+    tl.fromTo("#end-word .end-ch", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.05 }, 0.75);
+    tl.fromTo("#end-url", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }, 1.45);
+    tl.fromTo("#end-meta", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 1.75);
+    window.__timelines["endcard"] = tl;
+  </script>
+</template>

@@ -1,0 +1,54 @@
+<template>
+  <style>
+    @font-face { font-family: "DM Sans"; font-weight: 600; src: url("assets/fonts/dm-sans-latin-600-normal.woff2") format("woff2"); }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #fafaf8; font-family: "DM Sans", sans-serif; }
+    #proof-cam { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+    #proof-cam img { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    #proof-done { opacity: 0; }
+    #proof-ripple { position: absolute; left: -40px; top: -40px; width: 80px; height: 80px; border-radius: 50%; border: 5px solid #fff; opacity: 0; }
+    #proof-cursor { position: absolute; left: 0; top: 0; width: 64px; height: 64px; }
+    #proof-chip { position: absolute; left: 72px; bottom: 64px; padding: 22px 36px; border-radius: 18px; background: #292c28; color: #fafaf8; font-size: 60px; font-weight: 600; letter-spacing: -0.03em; opacity: 0; }
+    #proof-veil { position: absolute; inset: 0; background: #fafaf8; opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="proof" data-width="1920" data-height="1080">
+    <div id="proof-cam">
+      <img id="proof-loaded" src="assets/ui-excel-loaded.png" alt="Paperwork PDF to Excel with northwind-q3.pdf loaded" />
+      <img id="proof-done" src="assets/ui-excel-done.png" alt="Paperwork PDF to Excel finished" />
+    </div>
+    <div id="proof-ripple"></div>
+    <svg id="proof-cursor" viewBox="0 0 32 32"><path d="M6 3l19 13-8.5 1.6L21 27l-4 2-4.6-9.6L6 25z" fill="#fff" stroke="#292c28" stroke-width="2" stroke-linejoin="round"/></svg>
+    <div id="proof-chip"><span id="proof-line">One click</span></div>
+    <div id="proof-veil"></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // Camera framings: x = 960 - px * s, y = 540 - py * s for a focus point (px, py).
+    tl.fromTo("#proof-cam", { x: 0, y: 0, scale: 1 }, { x: -416, y: -888, scale: 2, duration: 0.6, ease: "power2.inOut" }, 0.25);
+    // Cursor enters from off-screen and lands on the "PDF to Excel" button (688, 714).
+    tl.fromTo("#proof-cursor", { x: 1980, y: 1150 }, { x: 952, y: 716, duration: 0.8, ease: "power3.out" }, 0.9);
+    tl.fromTo("#proof-chip", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.35, ease: "power3.out" }, 0.9);
+    // Click: ripple and a press on the frame, then the finished state.
+    tl.fromTo("#proof-ripple", { x: 960, y: 722, scale: 0.4, opacity: 0.9 }, { scale: 1.8, opacity: 0, duration: 0.45, ease: "power2.out" }, 2.0);
+    tl.to("#proof-cam", { scale: 1.98, x: -402, y: -874, duration: 0.08, yoyo: true, repeat: 1 }, 2.0);
+    tl.to("#proof-done", { opacity: 1, duration: 0.12 }, 2.3);
+    tl.to("#proof-chip", { opacity: 0, duration: 0.15 }, 2.9);
+    // Punch in on the product's own "Processed on your device" label (1540, 195).
+    tl.to("#proof-cam", { x: -3660, y: -45, scale: 3, duration: 0.6, ease: "power2.inOut" }, 3.1);
+    tl.to("#proof-cursor", { x: 1980, y: 1150, duration: 0.5, ease: "power2.in" }, 3.1);
+    tl.set("#proof-line", { textContent: "Nothing gets uploaded" }, 3.7);
+    tl.to("#proof-chip", { opacity: 1, duration: 0.3 }, 3.7);
+    tl.to("#proof-chip", { opacity: 0, duration: 0.15 }, 5.5);
+    // Back to the download button (688, 885) and click it.
+    tl.to("#proof-cam", { x: -416, y: -1230, scale: 2, duration: 0.6, ease: "power2.inOut" }, 5.7);
+    tl.set("#proof-line", { textContent: "Download a real XLSX" }, 6.3);
+    tl.to("#proof-chip", { opacity: 1, duration: 0.3 }, 6.3);
+    tl.to("#proof-cursor", { x: 952, y: 534, duration: 0.7, ease: "power3.out" }, 6.2);
+    tl.fromTo("#proof-ripple", { x: 960, y: 540, scale: 0.4, opacity: 0.9 }, { scale: 1.8, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false }, 7.2);
+    tl.to("#proof-chip", { opacity: 0, duration: 0.15 }, 7.7);
+    tl.to("#proof-cursor", { opacity: 0, duration: 0.15 }, 7.7);
+    // Zoom through the button into the spreadsheet.
+    tl.to("#proof-cam", { x: 960 - 688 * 14, y: 540 - 885 * 14, scale: 14, duration: 1.1, ease: "power3.in" }, 7.9);
+    tl.to("#proof-veil", { opacity: 1, duration: 0.3 }, 9.1);
+    window.__timelines["proof"] = tl;
+  </script>
+</template>

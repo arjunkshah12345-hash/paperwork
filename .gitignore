@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+.env*
+test-results/
+.wrangler/
+.dev.vars*
+public/paperwork-source.zip
+launch-video/out/

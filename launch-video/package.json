@@ -1,0 +1,25 @@
+{
+  "name": "paperwork-launch-video",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/Root.tsx --no-open --port=3198",
+    "score": "node scripts/score.mjs",
+    "render": "npm run score && remotion render src/Root.tsx PaperworkLaunch out/paperwork-launch.mp4 --codec=h264 --crf=18 --concurrency=4",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource/dm-sans": "5.2.6",
+    "@remotion/cli": "4.0.539",
+    "lucide-react": "0.468.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.539"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.10",
+    "@types/react-dom": "19.1.9",
+    "typescript": "5.8.3"
+  }
+}

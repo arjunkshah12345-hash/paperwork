@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Paperwork Recorder — screen + face cam</title>
+<style>
+  @font-face { font-family: "DM Sans"; font-weight: 400 700; src: url("../deck/assets/fonts/dm-sans-latin-500-normal.woff2") format("woff2"); }
+  :root { --paper: #fafaf8; --ink: #292c28; --muted: #5d6159; --border: #e4e5de; --accent: #bc4d32; --panel: #fffffd; }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: "DM Sans", system-ui, sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; display: grid; grid-template-columns: 1fr 380px; }
+  main { padding: 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  header { display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 20px; letter-spacing: -0.02em; }
+  header .hint { color: var(--muted); font-size: 14px; }
+  .stage { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #1c1e1b; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+  canvas { width: 100%; height: 100%; display: block; }
+  .rec-badge { position: absolute; top: 14px; left: 14px; display: none; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: rgba(0,0,0,.6); color: #fff; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .rec-badge i { width: 10px; height: 10px; border-radius: 50%; background: #ff4b3a; }
+  body.recording .rec-badge { display: flex; }
+  body.paused .rec-badge i { background: #f5b301; }
+  .countdown { position: absolute; inset: 0; display: none; place-items: center; font-size: 160px; font-weight: 700; color: #fff; background: rgba(0,0,0,.35); }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  button, select { font: inherit; font-size: 15px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); color: var(--ink); padding: 9px 14px; cursor: pointer; }
+  button:hover { border-color: #c9cbc2; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  label { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  input[type=range] { accent-color: var(--accent); }
+  aside { border-left: 1px solid var(--border); background: var(--panel); padding: 20px; display: flex; flex-direction: column; gap: 16px; height: 100vh; position: sticky; top: 0; overflow: auto; }
+  aside h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .group { display: flex; flex-direction: column; gap: 10px; }
+  .corners { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .shapes { display: flex; gap: 6px; }
+  .prompter { flex: 1; min-height: 220px; display: flex; flex-direction: column; gap: 10px; }
+  .prompter .text { flex: 1; overflow: auto; font-size: 22px; line-height: 1.45; padding: 14px; border-radius: 12px; background: var(--paper); border: 1px solid var(--border); }
+  .prompter .nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; color: var(--muted); }
+  .result { display: none; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+  .result video { width: 100%; max-width: 720px; border-radius: 10px; background: #000; }
+  .result a { color: var(--accent); font-weight: 600; }
+  .note { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .error { color: #b3261e; font-size: 14px; }
+  kbd { font: inherit; font-size: 12px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Recorder</h1>
+    <span class="hint">Your screen fills the frame, your camera sits in the corner. Everything stays on this computer.</span>
+  </header>
+  <div class="stage">
+    <canvas id="canvas" width="1920" height="1080" aria-label="Recording preview"></canvas>
+    <div class="rec-badge"><i></i><span id="clock">00:00</span></div>
+    <div class="countdown" id="countdown">3</div>
+  </div>
+  <div class="bar">
+    <button id="shareBtn">Share screen or tab</button>
+    <button id="camBtn">Turn on camera + mic</button>
+    <button id="recBtn" class="primary" disabled>Start recording</button>
+    <button id="pauseBtn" disabled>Pause</button>
+    <button id="stopBtn" disabled>Stop</button>
+    <span class="note">Shortcuts: <kbd>R</kbd> start/stop · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> script</span>
+  </div>
+  <p class="error" id="error" role="alert"></p>
+  <section class="result" id="result">
+    <strong id="resultTitle">Your recording</strong>
+    <video id="playback" controls playsinline></video>
+    <a id="download" download>Download</a>
+    <span class="note" id="resultNote"></span>
+  </section>
+</main>
+<aside>
+  <div class="group">
+    <h2>Camera</h2>
+    <select id="camSelect" aria-label="Camera"><option value="">Default camera</option></select>
+    <select id="micSelect" aria-label="Microphone"><option value="">Default microphone</option></select>
+    <div class="corners" role="group" aria-label="Camera corner">
+      <button data-corner="tl">↖ Top left</button><button data-corner="tr">↗ Top right</button>
+      <button data-corner="bl">↙ Bottom left</button><button data-corner="br" class="on">↘ Bottom right</button>
+    </div>
+    <div class="shapes" role="group" aria-label="Camera shape">
+      <button data-shape="circle" class="on">Circle</button><button data-shape="rounded">Rounded</button><button data-shape="hidden">Hide</button>
+    </div>
+    <label>Size <input id="size" type="range" min="12" max="40" value="22" /></label>
+    <label><input id="mirror" type="checkbox" checked /> Mirror camera</label>
+    <label><input id="ring" type="checkbox" checked /> Accent ring</label>
+    <label><input id="tabAudio" type="checkbox" /> Include shared tab audio</label>
+  </div>
+  <div class="prompter">
+    <h2>Script</h2>
+    <div class="nav"><button id="prevLine">← Back</button><span id="lineLabel"></span><button id="nextLine">Next →</button></div>
+    <div class="text" id="lineText"></div>
+    <p class="note">The script is only on this panel, never in the recording. For the cleanest take, open this recorder in its own window, share the deck tab, and keep this window visible beside it.</p>
+  </div>
+</aside>
+<script src="script.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id)
+  const canvas = $('canvas'), ctx = canvas.getContext('2d')
+  const W = canvas.width, H = canvas.height
+  const screenVideo = Object.assign(document.createElement('video'), { muted: true, playsInline: true })
+  const camVideo = Object.assign(document.createElement('video'), { muted: true, playsInline: true })
+  const state = { corner: 'br', shape: 'circle', size: 22, mirror: true, ring: true, screen: null, cam: null, recorder: null, chunks: [], started: 0, pausedAt: 0, pausedTotal: 0, line: 0 }
+  const showError = message => { $('error').textContent = message || '' }
+
+  // Frame clock in a worker: timers on the page itself are throttled to 1 Hz when this
+  // tab is hidden, which would freeze the recording while you present another tab.
+  const worker = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 1000 / 30)'], { type: 'text/javascript' })))
+  worker.onmessage = draw
+
+  function draw() {
+    ctx.fillStyle = '#1c1e1b'
+    ctx.fillRect(0, 0, W, H)
+    if (state.screen && screenVideo.videoWidth) {
+      const scale = Math.min(W / screenVideo.videoWidth, H / screenVideo.videoHeight)
+      const w = screenVideo.videoWidth * scale, h = screenVideo.videoHeight * scale
+      ctx.drawImage(screenVideo, (W - w) / 2, (H - h) / 2, w, h)
+    } else {
+      ctx.fillStyle = '#a0a69a'
+      ctx.font = '600 44px "DM Sans", system-ui'
+      ctx.textAlign = 'center'
+      ctx.fillText('Share a screen, window or tab to start', W / 2, H / 2)
+    }
+    if (state.cam && camVideo.videoWidth && state.shape !== 'hidden') drawCam()
+  }
+
+  function drawCam() {
+    const d = Math.round(H * state.size / 100), margin = 40
+    const w = state.shape === 'circle' ? d : Math.round(d * 4 / 3), h = d
+    const x = state.corner.endsWith('l') ? margin : W - w - margin
+    const y = state.corner.startsWith('t') ? margin : H - h - margin
+    const vw = camVideo.videoWidth, vh = camVideo.videoHeight
+    const crop = Math.min(vw / w, vh / h), sw = w * crop, sh = h * crop
+    ctx.save()
+    ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 8
+    shapePath(x, y, w, h); ctx.fillStyle = '#000'; ctx.fill()
+    ctx.restore()
+    ctx.save()
+    shapePath(x, y, w, h); ctx.clip()
+    if (state.mirror) { ctx.translate(x * 2 + w, 0); ctx.scale(-1, 1) }
+    ctx.drawImage(camVideo, (vw - sw) / 2, (vh - sh) / 2, sw, sh, x, y, w, h)
+    ctx.restore()
+    if (state.ring) { shapePath(x, y, w, h); ctx.lineWidth = 6; ctx.strokeStyle = '#bc4d32'; ctx.stroke() }
+  }
+
+  function shapePath(x, y, w, h) {
+    ctx.beginPath()
+    if (state.shape === 'circle') ctx.arc(x + w / 2, y + h / 2, w / 2, 0, Math.PI * 2)
+    else ctx.roundRect(x, y, w, h, 28)
+  }
+
+  async function shareScreen() {
+    showError()
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: $('tabAudio').checked, selfBrowserSurface: 'exclude', surfaceSwitching: 'include' })
+      state.screen?.getTracks().forEach(track => track.stop())
+      state.screen = stream
+      screenVideo.srcObject = stream
+      await screenVideo.play()
+      stream.getVideoTracks()[0].addEventListener('ended', () => { state.screen = null; $('shareBtn').textContent = 'Share screen or tab'; updateButtons() })
+      $('shareBtn').textContent = 'Change shared screen'
+    } catch (error) { if (error.name !== 'NotAllowedError') showError(`Couldn't share the screen: ${error.message}`) }
+    updateButtons()
+  }
+
+  async function startCamera() {
+    showError()
+    try {
+      const camId = $('camSelect').value, micId = $('micSelect').value
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: camId ? { exact: camId } : undefined, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: { deviceId: micId ? { exact: micId } : undefined, echoCancellation: true, noiseSuppression: true },
+      })
+      state.cam?.getTracks().forEach(track => track.stop())
+      state.cam = stream
+      camVideo.srcObject = stream
+      await camVideo.play()
+      $('camBtn').textContent = 'Camera + mic on'
+      $('camBtn').classList.add('on')
+      await listDevices()
+    } catch (error) { showError(`Couldn't open the camera or mic: ${error.message}. Check the browser's site permissions.`) }
+    updateButtons()
+  }
+
+  async function listDevices() {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    for (const [select, kind, fallback] of [[$('camSelect'), 'videoinput', 'Camera'], [$('micSelect'), 'audioinput', 'Microphone']]) {
+      const current = select.value
+      select.replaceChildren(new Option(`Default ${fallback.toLowerCase()}`, ''))
+      devices.filter(device => device.kind === kind).forEach((device, index) => select.add(new Option(device.label || `${fallback} ${index + 1}`, device.deviceId)))
+      select.value = [...select.options].some(option => option.value === current) ? current : ''
+    }
+  }
+
+  function pickType() {
+    const types = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+    return types.find(type => MediaRecorder.isTypeSupported(type)) || ''
+  }
+
+  function mixedAudio() {
+    const sources = [state.cam, $('tabAudio').checked ? state.screen : null].filter(stream => stream?.getAudioTracks().length)
+    if (!sources.length) return []
+    const audio = new AudioContext()
+    const destination = audio.createMediaStreamDestination()
+    sources.forEach(stream => audio.createMediaStreamSource(stream).connect(destination))
+    state.audio = audio
+    return destination.stream.getAudioTracks()
+  }
+
+  async function countdown() {
+    const el = $('countdown')
+    el.style.display = 'grid'
+    for (const n of [3, 2, 1]) { el.textContent = n; await new Promise(resolve => setTimeout(resolve, 800)) }
+    el.style.display = 'none'
+  }
+
+  async function startRecording() {
+    if (state.recorder) return
+    showError()
+    $('result').style.display = 'none'
+    await countdown()
+    const stream = new MediaStream([...canvas.captureStream(30).getVideoTracks(), ...mixedAudio()])
+    const mimeType = pickType()
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 160_000 })
+    state.recorder = recorder; state.chunks = []; state.started = performance.now(); state.pausedTotal = 0
+    recorder.ondataavailable = event => event.data.size && state.chunks.push(event.data)
+    recorder.onstop = finish
+    recorder.start(1000)
+    document.body.classList.add('recording')
+    updateButtons()
+  }
+
+  function togglePause() {
+    const recorder = state.recorder
+    if (!recorder) return
+    if (recorder.state === 'recording') { recorder.pause(); state.pausedAt = performance.now(); document.body.classList.add('paused'); $('pauseBtn').textContent = 'Resume' }
+    else if (recorder.state === 'paused') { recorder.resume(); state.pausedTotal += performance.now() - state.pausedAt; document.body.classList.remove('paused'); $('pauseBtn').textContent = 'Pause' }
+  }
+
+  function stopRecording() { state.recorder?.stop() }
+
+  function finish() {
+    const type = state.recorder.mimeType || 'video/webm'
+    const blob = new Blob(state.chunks, { type })
+    const url = URL.createObjectURL(blob)
+    const extension = type.includes('mp4') ? 'mp4' : 'webm'
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
+    $('playback').src = url
+    $('download').href = url
+    $('download').download = `paperwork-recording-${stamp}.${extension}`
+    $('download').textContent = `Download ${extension.toUpperCase()} (${(blob.size / 1048576).toFixed(1)} MB)`
+    $('resultNote').textContent = extension === 'webm' ? 'This browser records WebM. To convert: ffmpeg -i in.webm -c:v libx264 -c:a aac out.mp4' : ''
+    $('result').style.display = 'flex'
+    state.audio?.close(); state.audio = null
+    state.recorder = null
+    document.body.classList.remove('recording', 'paused')
+    $('pauseBtn').textContent = 'Pause'
+    updateButtons()
+  }
+
+  function tickClock() {
+    if (state.recorder) {
+      const paused = state.recorder.state === 'paused' ? performance.now() - state.pausedAt : 0
+      const seconds = Math.floor((performance.now() - state.started - state.pausedTotal - paused) / 1000)
+      $('clock').textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+    }
+    requestAnimationFrame(tickClock)
+  }
+
+  function updateButtons() {
+    const recording = !!state.recorder
+    $('recBtn').disabled = recording || !(state.screen || state.cam)
+    $('pauseBtn').disabled = !recording
+    $('stopBtn').disabled = !recording
+  }
+
+  // Teleprompter
+  const lines = window.PROMPTER || []
+  function showLine(index) {
+    if (!lines.length) { $('lineText').textContent = 'No script loaded. Run python3 build.py in ../deck to generate script.js.'; return }
+    state.line = Math.max(0, Math.min(lines.length - 1, index))
+    $('lineLabel').textContent = `${state.line + 1} / ${lines.length} · ${lines[state.line].label}`
+    $('lineText').textContent = lines[state.line].text
+  }
+
+  $('shareBtn').onclick = shareScreen
+  $('camBtn').onclick = startCamera
+  $('recBtn').onclick = startRecording
+  $('pauseBtn').onclick = togglePause
+  $('stopBtn').onclick = stopRecording
+  $('prevLine').onclick = () => showLine(state.line - 1)
+  $('nextLine').onclick = () => showLine(state.line + 1)
+  $('camSelect').onchange = () => state.cam && startCamera()
+  $('micSelect').onchange = () => state.cam && startCamera()
+  $('size').oninput = event => { state.size = +event.target.value }
+  $('mirror').onchange = event => { state.mirror = event.target.checked }
+  $('ring').onchange = event => { state.ring = event.target.checked }
+  document.querySelectorAll('[data-corner]').forEach(button => button.onclick = () => {
+    state.corner = button.dataset.corner
+    document.querySelectorAll('[data-corner]').forEach(other => other.classList.toggle('on', other === button))
+  })
+  document.querySelectorAll('[data-shape]').forEach(button => button.onclick = () => {
+    state.shape = button.dataset.shape
+    document.querySelectorAll('[data-shape]').forEach(other => other.classList.toggle('on', other === button))
+  })
+  document.addEventListener('keydown', event => {
+    if (event.target.closest('select, input')) return
+    if (event.key === 'r' || event.key === 'R') { state.recorder ? stopRecording() : !$('recBtn').disabled && startRecording() }
+    else if (event.key === ' ') { event.preventDefault(); togglePause() }
+    else if (event.key === 'ArrowRight') showLine(state.line + 1)
+    else if (event.key === 'ArrowLeft') showLine(state.line - 1)
+  })
+  if (!navigator.mediaDevices?.getDisplayMedia || !window.MediaRecorder) showError('This browser cannot record the screen. Use a current Chrome, Edge, Arc or Firefox.')
+  if (!isSecureContext) showError('Open this page from http://localhost (see launch/README.md). Browsers block the camera on plain files and http sites.')
+  showLine(0)
+  tickClock()
+  updateButtons()
+})()
+</script>
+</body>
+</html>

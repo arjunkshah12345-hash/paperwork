@@ -1,0 +1,23 @@
+<template>
+  <style>
+    @font-face { font-family: "DM Sans"; font-weight: 500; src: url("assets/fonts/dm-sans-latin-500-normal.woff2") format("woff2"); }
+    @font-face { font-family: "DM Sans"; font-weight: 700; src: url("assets/fonts/dm-sans-latin-700-normal.woff2") format("woff2"); }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #e9eae6; font-family: "DM Sans", sans-serif; }
+    #reveal-field { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #bc4d32; transform-origin: 0 0; }
+    #reveal-name { position: absolute; left: 0; right: 0; top: 380px; text-align: center; font-size: 190px; font-weight: 700; letter-spacing: -0.045em; color: #fffdf8; }
+    #reveal-sub { position: absolute; left: 0; right: 0; top: 640px; text-align: center; font-size: 56px; font-weight: 500; letter-spacing: -0.02em; color: #fbe3da; }
+  </style>
+  <div id="root" data-composition-id="reveal" data-width="1920" data-height="1080">
+    <div id="reveal-field"></div>
+    <div id="reveal-name" data-var-text="reveal-name">Paperwork</div>
+    <div id="reveal-sub" data-var-text="reveal-sub">Free PDF tools that run in your browser</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // The red "0" cell from the paste grows into the whole frame.
+    tl.fromTo("#reveal-field", { x: 192, y: 818, scaleX: 1010 / 1920, scaleY: 58 / 1080, backgroundColor: "#c93b2b" }, { x: 0, y: 0, scaleX: 1, scaleY: 1, backgroundColor: "#bc4d32", duration: 0.55, ease: "power3.inOut" }, 0);
+    tl.fromTo("#reveal-name", { opacity: 0, scale: 0.92 }, { opacity: 1, scale: 1, duration: 0.45, ease: "power3.out" }, 0.45);
+    tl.fromTo("#reveal-sub", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }, 0.75);
+    window.__timelines["reveal"] = tl;
+  </script>
+</template>
